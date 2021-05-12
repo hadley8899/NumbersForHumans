@@ -1,0 +1,33 @@
+{
+    "name": "rhdevelopment/human-readable",
+    "description": "Readable Number Make numbers easier to read for humans!",
+    "keywords": [
+        "php",
+        "human readable",
+        "readable",
+        "rhDevelopment"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Ryan",
+            "email": "ryan@rh-development.co.uk",
+            "homepage": "https://rh-development.co.uk"
+        }
+    ],
+    "require": {
+        "php": ">=7.2",
+        "ext-intl": "*"
+    },
+    "require-dev": {
+        "roave/security-advisories": "dev-latest",
+        "phpunit/phpunit": "^9"
+    },
+    "autoload": {
+        "psr-4": {
+            "RHDevelopment\\Readable\\": "src"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true
+}
