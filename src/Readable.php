@@ -2,7 +2,13 @@
 
 namespace RHDevelopment\Readable;
 
+use Carbon\Carbon;
+use Carbon\CarbonInterval;
+use Carbon\Exceptions\InvalidFormatException;
+use Exception;
+use NumberFormatter;
 use RuntimeException;
+use TypeError;
 
 class Readable
 {
@@ -26,7 +32,7 @@ class Readable
      * @param int $decimals
      * @return string
      **/
-    public static function getHumanNumber($input, bool $showDecimal = false, int $decimals = 0): string
+    public static function getHumanNumber($input, bool $showDecimal = true, int $decimals = 0): string
     {
         if (!is_numeric($input)) {
             throw new RuntimeException('The value must be numeric!');
@@ -41,7 +47,6 @@ class Readable
         if ($input >= 0 && $input < 1000) {
             // 1 - 999
             $getFloor = floor($input);
-            $suffix = '';
         } elseif ($input >= 1000 && $input < 1000000) {
             // 1k-999k
             $getFloor = floor($input / 1000);
@@ -79,25 +84,30 @@ class Readable
     /**
      * Get Readable String of Number
      *
-     * @param int|double|float $input
+     * @param int|double $input
      * @param string $lang
      * @return string
      **/
-    public static function getNumberToString($input, string $lang = 'en'): string
+    public static function readableString($input, string $lang = 'en'): string
     {
         if (!in_array(gettype($input), ['integer', 'double', 'float'])) {
-            throw new TypeError("Wrong Input Type.");
+            throw new TypeError('Wrong Input Type.');
         }
 
         $digit = new NumberFormatter($lang, NumberFormatter::SPELLOUT);
-        $input = $digit->format($input);
-        return $lang === 'ar' ? str_replace('و ', 'و', $input) : $input;
+        $formattedString = $digit->format($input);
+
+        if (!$formattedString) {
+            return 'unknown';
+        }
+
+        return $lang === 'ar' ? str_replace('و ', 'و', $formattedString) : $formattedString;
     }
 
     /**
      * Get Readable Decimal Number
      *
-     * @param int $input
+     * @param int|double $input
      * @param int $decimals
      * @param string $point
      * @param string $delimiter
@@ -106,7 +116,7 @@ class Readable
     public static function getDecimal($input, int $decimals = 2, string $point = '.', string $delimiter = ','): ?string
     {
         if (!in_array(gettype($input), ['integer', 'double', 'float'])) {
-            throw new TypeError("Wrong Input Type.");
+            throw new TypeError('Wrong Input Type.');
         }
 
         return number_format($input, $decimals, $point, $delimiter);
@@ -131,7 +141,7 @@ class Readable
         if (is_float($input)) {
             $decInt = $input - (int)$input;
 
-            if ($decInt == 0) {
+            if ($decInt === 0) {
                 $input = (int)$input;
                 $decimals_length = 0;
             }
@@ -140,53 +150,53 @@ class Readable
         return number_format($input, $decimals_length, $point, $delimiter);
     }
 
-    // DATE & TIME
-
     /**
      * Prepare DateTime Variable => Object
      *
      *
-     * @param string|Carbon\Carbon $input
+     * @param string|Carbon $input
      * @param null|string $tz
-     * @return Carbon\Carbon
-     **/
-    public static function prepareDateTime(&$input, string $tz = null)
+     * @return Carbon
+     * @throws InvalidFormatException
+     */
+    public static function prepareDateTime($input, string $tz = null)
     {
-        if (!($input instanceof Carbon) && !($input instanceof IlluminateCarbon)) {
-            $input = Carbon::parse($input);
+        $carbon = null;
+        if (!($input instanceof Carbon)) {
+            $carbon = Carbon::parse($input);
         }
 
         if ($tz) {
-            $input->setTimezone($tz);
+            $carbon->setTimezone($tz);
         }
+
+        return $carbon;
     }
 
     /**
      * Get Readable Date
      *
-     * @param int $input
+     * @param string $input
+     * @param string|null $timezone
      * @return string
-     **/
-    public static function getDate($input, string $timezone = null): ?string
+     */
+    public static function getDate(string $input, string $timezone = null): ?string
     {
-        self::prepareDateTime($input, $timezone);
+        $input = self::prepareDateTime($input, $timezone);
         return $input->day . ' ' . $input->monthName . ' ' . $input->year;
     }
 
     /**
      * Get Readable Time
      *
-     * @param int|Carbon\Carbon $input
-     * @param bool $is12
+     * @param int|Carbon $input
+     * @param bool $hasSeconds
      * @param null|string $timezone
      * @return string
-     **/
-    public static function getTime($input, $is12 = false, bool $hasSeconds = false, string $timezone = null): ?string
+     */
+    public static function getTime($input, bool $hasSeconds = false, string $timezone = null): ?string
     {
-        self::prepareDateTime($input, $timezone);
-
-        if ($is12)
-            return $input->format('h:i' . ($hasSeconds ? ':s' : '') . ' ') . $input->meridiem();
+        $input = self::prepareDateTime($input, $timezone);
 
         return $input->format('H:i' . ($hasSeconds ? ':s' : ''));
     }
@@ -194,29 +204,29 @@ class Readable
     /**
      * Get Readable DateTime
      *
-     * @param int|Carbon\Carbon $input
-     * @param bool $is12
+     * @param int|Carbon $input
+     * @param bool $hasSeconds
      * @param null|string $timezone
      * @return string
-     **/
-    public static function getDateTime($input, $is12 = false, bool $hasSeconds = false, string $timezone = null): ?string
+     */
+    public static function getDateTime($input, bool $hasSeconds = false, string $timezone = null): ?string
     {
-        self::prepareDateTime($input, $timezone);
-        return $input->isoFormat('dddd, MMMM DD, YYYY ' . ($is12 ? 'hh:mm' . ($hasSeconds ? ':ss' : '') . ' A' : 'HH:mm' . ($hasSeconds ? ':ss' : '')));
+        $input = self::prepareDateTime($input, $timezone);
+        return $input->isoFormat('dddd, MMMM DD, YYYY ' . 'hh:mm' . ($hasSeconds ? ':ss' : '') . ' A');
     }
 
     /**
      * Get Readable DateTime
      *
-     * @param int|Carbon\Carbon $old
-     * @param null|int|Carbon\Carbon $new
+     * @param int|Carbon $old
+     * @param null|int|Carbon $new
      * @param null|string $timezone
      * @return string
      **/
     public static function getDiffDateTime($old, $new = null, string $timezone = null): ?string
     {
-        self::prepareDateTime($old, $timezone);
-        self::prepareDateTime($new, $timezone);
+        $old = self::prepareDateTime($old, $timezone);
+        $new = self::prepareDateTime($new, $timezone);
 
         return $old->diffForHumans($new);
     }
@@ -228,7 +238,9 @@ class Readable
      * @param string $comma
      * @param boolean $short
      * @return string
-     **/
+     *
+     * @throws Exception
+     */
     public static function getTimeLength(int $input, string $comma = ' ', bool $short = false): ?string
     {
         //years
@@ -261,21 +273,20 @@ class Readable
     /**
      * Get Readable DateTime Length from DateTimes
      *
-     * @param int|Carbon\Carbon $old
-     * @param null|int|Carbon\Carbon $new
+     * @param int|Carbon $old
+     * @param null|int|Carbon $new
+     * @param bool $full
      * @param string $comma
      * @param null|string $timezone
      * @return string
-     **/
-    public static function getDateTimeLength($old, $new = null, bool $full = false, string $comma = ' ', string $timezone = null): ?string
+     */
+    public static function getDateTimeLength($old, $new = null, string $comma = ' ', string $timezone = null): ?string
     {
-        self::prepareDateTime($old, $timezone);
-        self::prepareDateTime($new, $timezone);
+        $old = self::prepareDateTime($old, $timezone);
+        $new = self::prepareDateTime($new, $timezone);
 
-        return $old->diffForHumans($new, ['parts' => $full ? 7 : 0, 'join' => $comma]);
+        return $old->diffForHumans($new, ['parts' => 7, 'join' => $comma]);
     }
-
-    // FILE SIZES
 
     /**
      * Get Readable File Size
@@ -286,13 +297,16 @@ class Readable
      */
     public static function getSize(int $bytes, bool $decimal = true): ?string
     {
-        if ($bytes <= 0) return null;
+        if ($bytes <= 0) {
+            return null;
+        }
+
         $calcBase = $decimal ? 1000 : 1024;
 
         $bytes = (int)$bytes;
         $base = log($bytes) / log($calcBase);
-        $suffixes = $decimal ? ['B', 'KB', 'MB', 'GB', 'TB'] : ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+        $suffixes = $decimal ? ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EX'] : ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiX'];
 
-        return round(pow($calcBase, $base - floor($base)), 2) . ' ' . $suffixes[floor($base)];
+        return round($calcBase ** ($base - floor($base)), 2) . ' ' . $suffixes[floor($base)];
     }
 }
