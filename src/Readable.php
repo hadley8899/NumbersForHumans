@@ -39,46 +39,53 @@ class Readable
         }
 
         $decimals = $showDecimal && $decimals === 0 ? 1 : $decimals;
-        $floorNumber = 0;
+        $value = (float)$input;
+        $sign = $value < 0 ? '-' : '';
+        $value = abs($value);
 
+        $floorNumber = 0;
         $getFloor = floor(0);
         $suffix = '';
 
-        if ($input >= 0 && $input < 1000) {
+        if ($value >= 0 && $value < 1000) {
             // 1 - 999
-            $getFloor = floor($input);
-        } elseif ($input >= 1000 && $input < 1000000) {
+            $getFloor = floor($value);
+        } elseif ($value >= 1000 && $value < 1000000) {
             // 1k-999k
-            $getFloor = floor($input / 1000);
+            $getFloor = floor($value / 1000);
             $floorNumber = 1000;
             $suffix = 'K';
-        } elseif ($input >= 1000000 && $input < 1000000000) {
+        } elseif ($value >= 1000000 && $value < 1000000000) {
             // 1m-999m
-            $getFloor = floor($input / 1000000);
+            $getFloor = floor($value / 1000000);
             $floorNumber = 1000000;
             $suffix = 'M';
-        } elseif ($input >= 1000000000 && $input < 1000000000000) {
+        } elseif ($value >= 1000000000 && $value < 1000000000000) {
             // 1b-999b
-            $getFloor = floor($input / 1000000000);
+            $getFloor = floor($value / 1000000000);
             $floorNumber = 1000000000;
             $suffix = 'B';
-        } elseif ($input >= 1000000000000) {
+        } elseif ($value >= 1000000000000) {
             // 1t+
-            $getFloor = floor($input / 1000000000000);
+            $getFloor = floor($value / 1000000000000);
             $floorNumber = 1000000000000;
             $suffix = 'T';
         }
 
         // Decimals
         if ($showDecimal && $floorNumber > 0) {
-            $input -= ($getFloor * $floorNumber);
-            if ($input > 0) {
-                $input /= $floorNumber;
-                $getFloor += $input;
+            $value -= ($getFloor * $floorNumber);
+            if ($value > 0) {
+                $value /= $floorNumber;
+                $getFloor += $value;
             }
         }
 
-        return !empty($getFloor . $suffix) ? number_format($getFloor, $decimals) . $suffix : 0;
+        if (empty($getFloor . $suffix)) {
+            return '0';
+        }
+
+        return ($sign ? '-' : '') . number_format($getFloor, $decimals) . $suffix;
     }
 
     /**
@@ -141,7 +148,7 @@ class Readable
         if (is_float($input)) {
             $decInt = $input - (int)$input;
 
-            if ($decInt === 0) {
+            if (abs($decInt) < PHP_FLOAT_EPSILON) {
                 $input = (int)$input;
                 $decimals_length = 0;
             }
@@ -161,10 +168,7 @@ class Readable
      */
     public static function prepareDateTime($input, string $tz = null)
     {
-        $carbon = null;
-        if (!($input instanceof Carbon)) {
-            $carbon = Carbon::parse($input);
-        }
+        $carbon = $input instanceof Carbon ? $input->copy() : Carbon::parse($input);
 
         if ($tz) {
             $carbon->setTimezone($tz);
@@ -305,8 +309,69 @@ class Readable
 
         $bytes = (int)$bytes;
         $base = log($bytes) / log($calcBase);
-        $suffixes = $decimal ? ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EX'] : ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiX'];
+        // Correct binary/decimal suffixes (EB / EiB for exabytes)
+        $suffixes = $decimal ? ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB'] : ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB'];
 
         return round($calcBase ** ($base - floor($base)), 2) . ' ' . $suffixes[floor($base)];
+    }
+
+    /**
+     * Get percentage string for a value out of a total (e.g. "40.00%")
+     *
+     * @param int|float|string $value
+     * @param int|float|string $total
+     * @param int $decimals
+     * @param string $point
+     * @param string $delimiter
+     * @return string|null
+     */
+    public static function getPercentage($value, $total, int $decimals = 2, string $point = '.', string $delimiter = ','): ?string
+    {
+        if (!is_numeric($value) || !is_numeric($total)) {
+            throw new RuntimeException('Both value and total must be numeric!');
+        }
+
+        $total = (float)$total;
+        if ($total == 0.0) {
+            return null;
+        }
+
+        $percent = ((float)$value / $total) * 100;
+
+        return number_format($percent, $decimals, $point, $delimiter) . '%';
+    }
+
+    /**
+     * Get ordinal string for integers (English, e.g. 1st, 2nd, 3rd, 11th)
+     *
+     * @param int $number
+     * @return string
+     */
+    public static function getOrdinal(int $number): string
+    {
+        // Preserve sign
+        $sign = $number < 0 ? '-' : '';
+        $abs = abs($number);
+
+        $mod100 = $abs % 100;
+        if ($mod100 >= 11 && $mod100 <= 13) {
+            $suffix = 'th';
+        } else {
+            switch ($abs % 10) {
+                case 1:
+                    $suffix = 'st';
+                    break;
+                case 2:
+                    $suffix = 'nd';
+                    break;
+                case 3:
+                    $suffix = 'rd';
+                    break;
+                default:
+                    $suffix = 'th';
+            }
+        }
+
+        return $sign . $abs . $suffix;
     }
 }
